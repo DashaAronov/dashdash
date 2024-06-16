@@ -1,0 +1,73 @@
+WITH application_downloads  AS (
+    SELECT
+       count(ad.app_download_key) as application_downloads,  0 as rides
+  from app_downloads as ad),
+  
+sign_ups AS (SELECT count(s.user_id) as signed_users,  0 as rides
+
+    FROM signups s
+    LEFT JOIN app_downloads as ad ON s.session_id = ad.app_download_key),
+    
+request_ride AS (SELECT count(distinct rr.user_id) as requested_rides, count(distinct rr.ride_id) as rides
+                 from ride_requests as rr),
+rides_accepted AS (SELECT count(distinct rr.user_id) as rides_accepted, count(distinct rr.ride_id) as rides_taken
+                 from ride_requests as rr
+                WHERE rr.accept_ts is not null),
+ride_complete AS (SELECT count(distinct rr.user_id) as rides_completed, count(distinct rr.ride_id) as rides_comp
+                 from ride_requests as rr
+                WHERE rr.dropoff_ts is not null),  
+payment AS (SELECT count(distinct user_id) as payed_rides, count(distinct tr.ride_id) as rides_payed
+                         from transactions as tr
+            LEFT JOIN ride_requests  as rr ON rr.ride_id=tr.ride_id
+            WHERE tr.charge_status = 'Approved'),
+ review as (SELECT count (distinct user_id) as review, count(distinct r.ride_id) as rides_reviewed
+            FROM reviews as r)
+
+    SELECT
+        1 AS funnel_step,
+        'downloads' AS funnel_name,
+        application_downloads AS number_of_users,
+  rides AS number_of_rides
+    FROM application_downloads
+  
+
+    UNION
+
+    SELECT
+        2 AS funnel_step,
+        'signed_up' AS funnel_name,
+        signed_users AS number_of_users,
+ rides AS number_of_rides
+    FROM sign_ups
+  UNION 
+    SELECT  3 AS funnel_step,
+        'requested_ride' AS funnel_name,
+        requested_rides AS number_of_users,
+  rides AS number_of_rides
+  
+    FROM request_ride
+  UNION
+  SELECT  4 AS funnel_step,
+        'accepted_by_driver' AS funnel_name,
+        rides_accepted AS number_of_users,
+  rides_taken AS number_of_rides
+    FROM rides_accepted
+  UNION
+  SELECT 5 AS funnel_step,
+        'ride_completed' AS funnel_name,
+        rides_completed AS number_of_users,
+  rides_comp AS number_of_rides
+    FROM ride_complete
+ UNION
+  SELECT 6 AS funnel_step,
+        'payed_rides' AS funnel_name,
+        payed_rides AS number_of_users,
+   rides_payed AS number_of_rides
+    FROM payment
+  UNION
+   SELECT 7 AS funnel_step,
+        'given_reviews' AS funnel_name,
+        review AS number_of_users,
+   rides_reviewed AS number_of_rides
+    FROM review
+    ORDER BY funnel_step;
